@@ -1,0 +1,32 @@
+{
+    "configurations": [
+        {
+            "name": "OpenCV",
+            "includePath": [
+                "${workspaceFolder}/**",
+                "C:\\Users\\Dusti\\Documents\\Programming\\opencv\\mingw-build\\install\\include",
+                "C:\\Users\\Dusti\\Documents\\Programming\\opencv\\mingw-build\\install\\include\\opencv2"
+            ],
+            "defines": [
+                "_DEBUG",
+                "UNICODE",
+                "_UNICODE"
+            ],
+            "cStandard": "c17",
+            "cppStandard": "gnu++20",
+            "intelliSenseMode": "windows-gcc-x64",
+            "compilerPath": "C:/msys64/mingw64/bin/g++.exe",
+            "compilerArgs": [
+                "-I\"C:\\Users\\Dusti\\Documents\\Programming\\opencv\\mingw-build\\install\\include\"",
+                "-I\"C:\\Users\\Dusti\\Documents\\Programming\\opencv\\mingw-build\\install\\include\\opencv2\"",
+                "-L\"C:\\Users\\Dusti\\Documents\\Programming\\opencv\\mingw-build\\install\\x64\\mingw\\lib\"",
+                "-l:libopencv_imgproc490.dll.a",
+                "-l:libopencv_core490.dll.a",
+                "-l:libopencv_imgcodecs490.dll.a",
+                "-l:libopencv_highgui490.dll.a",
+                "-l:libopencv_videoio490.dll.a"
+            ]
+        }
+    ],
+    "version": 4
+}
