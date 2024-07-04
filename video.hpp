@@ -44,7 +44,23 @@ public:
     return success;
   }
 
-  void show(pipeline::Pipeline p)
+  template <typename Tp> Tp calc(pipeline::Task<Tp> p)
+  {
+    cv::Mat buff = frame;
+    return p(buff);
+  }
+
+  cv::Mat calc(pipeline::DispPipeline p)
+  {
+    cv::Mat buff = frame;
+    for (auto &task : p)
+    {
+      buff = task(buff);
+    }
+    return buff;
+  }
+
+  void show(pipeline::DispPipeline p)
   {
     cv::Mat buff = frame;
     for (auto &task : p)

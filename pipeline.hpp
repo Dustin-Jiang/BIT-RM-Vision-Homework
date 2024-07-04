@@ -8,8 +8,10 @@
 
 namespace pipeline
 {
-  typedef std::function<cv::Mat(cv::Mat &)> Task;
-  typedef std::vector<Task> Pipeline;
+  template <typename Tp> using Task = std::function<Tp(cv::Mat &)>;
+  template <typename Tp> using Pipeline = std::vector<Task<Tp>>;
+  using DispTask = Task<cv::Mat>;
+  using DispPipeline = std::vector<DispTask>;
 
   cv::Mat grayscale(cv::Mat &frame)
   {

@@ -7,16 +7,17 @@ int main()
 {
   // 打开视频文件
   Player player{"target.mp4"};
+
   bool success = player.isOpened() && player.next();
   double scale = 1.0;
+
   bool isBinary = false;
   bool isBorder = false;
   bool isDetect = false;
 
-  pipeline::Pipeline operations;
-  operations.push_back([&](cv::Mat &frame) {
-    if (!isBinary) return frame;
-    
+  pipeline::DispPipeline disps;
+
+  auto binary = ([&](cv::Mat &frame) {
     cv::Mat blue;
     frame.copyTo(blue);
     blue = pipeline::channel_b(blue);
@@ -52,19 +53,8 @@ int main()
     return buff;
   });
 
-  operations.push_back([&](cv::Mat &frame) {
-    if (!isBorder) return frame;
-    cv::Mat buff, res;
-    frame.copyTo(buff);
-
-    cv::Canny(buff, res, 100, 200);
-    return res;
-  });
-
-  operations.push_back([&](cv::Mat &frame) {
-    if (!isBinary) return frame;
-    if (!isDetect) return frame;
-
+  auto detect = ([&](cv::Mat &frame) -> std::vector<std::vector<cv::Point2f>>
+  {
     cv::Mat buff;
     frame.copyTo(buff);
 
@@ -100,9 +90,31 @@ int main()
         }
       }
 
+      float max_width = 0.0;
+      for (int i = 0; i < 4; i++)
+      {
+        float delta_x = vertices[i].x - vertices[(i + 1) % 4].x;
+        if (delta_x > max_width)
+        {
+          max_width = delta_x;
+        }
+      }
+
       if (max_height < 20.0) continue;
+      if (max_width > 20.0) continue;
 
       rects.push_back(rect);
+    }
+
+    for (auto rect : rects)
+    {
+      cv::Point2f verts[4];
+      rect.points(verts);
+
+      // cv::line(buff, verts[0], verts[1], cv::Scalar(0, 255, 0), 2);
+      // cv::line(buff, verts[1], verts[2], cv::Scalar(0, 255, 0), 2);
+      // cv::line(buff, verts[2], verts[3], cv::Scalar(0, 255, 0), 2);
+      // cv::line(buff, verts[3], verts[0], cv::Scalar(0, 255, 0), 2);
     }
 
     std::vector<std::vector<cv::RotatedRect>> pairs;
@@ -115,15 +127,38 @@ int main()
         auto rect2 = rects[j];
 
         if (
-          std::fabs(rect1.center.y - rect2.center.y) < 15.0 &&
-          std::fabs(rect1.center.x - rect2.center.x) < 100.0
+          std::fabs(rect1.center.y - rect2.center.y) > 15.0 ||
+          std::fabs(rect1.center.x - rect2.center.x) > 200.0
         )
         {
-          pairs.push_back({rect1, rect2});
+          continue;
         }
+
+        cv::Point2f vert1[4], vert2[4];
+        rect1.points(vert1);
+        rect2.points(vert2);
+
+        std::sort(vert1, vert1 + 4, [](cv::Point2f a, cv::Point2f b) {
+          return a.y < b.y;
+        });
+        std::sort(vert2, vert2 + 4, [](cv::Point2f a, cv::Point2f b) {
+          return a.y < b.y;
+        });
+
+        auto k1 = (vert1[0].x + vert1[1].x - vert1[2].x - vert1[3].x) / (vert1[0].y + vert1[1].y - vert1[2].y - vert1[3].y);
+        auto k2 = (vert2[0].x + vert2[1].x - vert2[2].x - vert2[3].x) / (vert2[0].y + vert2[1].y - vert2[2].y - vert2[3].y);
+
+        // 判断斜率是否相近 去除明显不平行
+        if (k1 * k2 <= 0.0 && std::fabs(k1 - k2) > 0.1)
+        {
+          continue;
+        }
+
+        pairs.push_back({rect1, rect2});
       }
     }
 
+    std::vector<std::vector<cv::Point2f>> results;
     for (auto pair : pairs)
     {
       std::vector<cv::Point2f> verts;
@@ -137,21 +172,23 @@ int main()
           return a.y < b.y;
         });
 
-        verts.push_back((vertices[0] + vertices[1]) / 2);
-        verts.push_back((vertices[2] + vertices[3]) / 2);
+        auto top = (vertices[0] + vertices[1]) / 2;
+        auto bottom = (vertices[2] + vertices[3]) / 2;
+
+        auto center = (top + bottom) / 2;
+
+        verts.push_back(center + (top - center) * 2);
+        verts.push_back(center + (bottom - center) * 2);
       }
 
-      cv::line(buff, verts[0], verts[1], cv::Scalar(0, 0, 255), 2);
-      cv::line(buff, verts[1], verts[2], cv::Scalar(0, 0, 255), 2);
-      cv::line(buff, verts[2], verts[3], cv::Scalar(0, 0, 255), 2);
-      cv::line(buff, verts[3], verts[0], cv::Scalar(0, 0, 255), 2);
+      results.push_back(verts);
     }
     
-    return buff;
+    return results;
   });
 
   // 缩放
-  operations.push_back([&](cv::Mat &frame) { return pipeline::scale(frame, scale); });
+  auto scale_img = [&](cv::Mat &frame) { return pipeline::scale(frame, scale); };
 
   while (player.playing)
   {
@@ -164,7 +201,31 @@ int main()
     }
 
     // 显示帧
-    player.show(operations);
+    pipeline::Task<std::vector<std::vector<cv::Point2f>>> calcs = [&](cv::Mat &frame)
+    {
+      cv::Mat buff;
+      frame.copyTo(buff);
+      buff = binary(buff);
+      return detect(buff);
+    };
+    
+    auto rects = player.calc(calcs);
+
+    player.show({ [&](cv::Mat &frame)
+    {
+      cv::Mat buff;
+      frame.copyTo(buff);
+
+      for (auto verts : rects)
+      {
+        cv::line(buff, verts[0], verts[1], cv::Scalar(0, 0, 255), 2);
+        cv::line(buff, verts[1], verts[3], cv::Scalar(0, 0, 255), 2);
+        cv::line(buff, verts[2], verts[3], cv::Scalar(0, 0, 255), 2);
+        cv::line(buff, verts[2], verts[0], cv::Scalar(0, 0, 255), 2);
+      }
+
+      return buff;
+    }, scale_img });
 
     char key = cv::waitKey(0);
     if (key == 'q')
