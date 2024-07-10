@@ -13,14 +13,15 @@ private:
   cv::Mat frame;
 
 public:
-  bool playing;
+  bool play_end;
+  bool playing = false;
 
-  Player(const std::string &filename) : cap(filename), playing(true)
+  Player(const std::string &filename) : cap(filename), play_end(true)
   {
     if (!cap.isOpened())
     {
       std::cerr << "Error opening video file or file not found!" << std::endl;
-      playing = false;
+      play_end = false;
       return;
     }
 
@@ -38,7 +39,7 @@ public:
     if (!success)
     {
       std::cout << "Can't receive frame (stream end?)." << std::endl;
-      playing = false;
+      play_end = false;
     }
 
     return success;
@@ -77,7 +78,7 @@ public:
 
   void stop()
   {
-    playing = false;
+    play_end = false;
   }
 
   bool save_frame()
