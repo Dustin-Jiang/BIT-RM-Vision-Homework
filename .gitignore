@@ -1,3 +1,4 @@
 *.exe
 *.jpg
 *.mp4
+!test.mp4
