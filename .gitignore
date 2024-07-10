@@ -2,3 +2,4 @@
 *.jpg
 *.mp4
 !test.mp4
+!result.mp4
